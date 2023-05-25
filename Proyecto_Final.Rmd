@@ -5,7 +5,63 @@ date: "2023-05-25"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+# install.packages("mice")
+# install.packages("VIM")
+library(VIM)
+library(mice)
+library(dplyr)
+```
+
+```{r base-de-datos}
+infoHeroes <- read.csv("data/heroesInformation.csv", na.strings = c("-", "-99", "-99.0")) 
+# infoPowers <- read.csv("data/superHeroPowers.csv")
+infoStats <- read.csv("data/charactersStats.csv", na.strings = "")
+colnames(infoHeroes)[2] <- "Name"
+
+DC_Marvel <- infoHeroes %>% 
+  filter(infoHeroes$Publisher %in% c("DC Comics", "Marvel Comics"))
+
+duplicated(DC_Marvel$Name)
+dim(DC_Marvel)
+DC_Marvel <- DC_Marvel %>%
+  filter(!duplicated(Name))
+
+Dc_Marvel_StatsInfo <- left_join(DC_Marvel, infoStats, by = "Name")
+
+Dc_Marvel_StatsInfo %>%
+count(Height)
+
+md.pattern(Dc_Marvel_StatsInfo, rotate.names = T)
+
+Dc_Marvel_StatsInfo <- Dc_Marvel_StatsInfo[,-9]
+
+aggr_plot <- aggr(Dc_Marvel_StatsInfo, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(Dc_Marvel_StatsInfo), 
+                  cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+
+Dc_Marvel_StatsInfo$Race[is.na(Dc_Marvel_StatsInfo$Race)] <- "Undefined"
+Dc_Marvel_StatsInfo$Eye.color[is.na(Dc_Marvel_StatsInfo$Eye.color)] <- "Undefined"
+Dc_Marvel_StatsInfo$Alignment.x[is.na(Dc_Marvel_StatsInfo$Alignment.x)] <- "Undefined"
+Dc_Marvel_StatsInfo$Hair.color[is.na(Dc_Marvel_StatsInfo$Hair.color)] <- "Undefined"
+Dc_Marvel_StatsInfo$Gender[is.na(Dc_Marvel_StatsInfo$Gender)] <- "Undefined"
+
+```
+
+```{r}
+columns <- c("Weight", "Height")
+imputed_data <- mice(Dc_Marvel_StatsInfo[,names(Dc_Marvel_StatsInfo) %in% columns],m = 1,
+  maxit = 1, method = "mean",seed = 2018,print=F)
+complete.data <- mice::complete(imputed_data)
+```
+
+
+```{r}
+# https://rpubs.com/ydmarinb/429757
+par(mfrow=c(1,2))
+plot(density(Dc_Marvel_StatsInfo$Weight,na.rm = T),col=2,main="Weight")
+lines(density(complete.data$Weight),col=3)
+plot(density(Dc_Marvel_StatsInfo$Height,na.rm = T),col=2,main="Height")
+lines(density(complete.data$Height),col=3)
 ```
 
