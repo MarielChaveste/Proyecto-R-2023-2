@@ -65,3 +65,6 @@ plot(density(Dc_Marvel_StatsInfo$Height,na.rm = T),col=2,main="Height")
 lines(density(complete.data$Height),col=3)
 ```
 
+# Base Claribel
+
+Prueba
