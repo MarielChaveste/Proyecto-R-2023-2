@@ -1,44 +1,70 @@
 ---
 title: "Proyecto Final"
 author: "Claribel Santiago, Mariel Chaveste"
-date: "2023-05-25"
+date: "`r Sys.Date()`"
 output: html_document
 ---
 
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-# install.packages("mice")
-# install.packages("VIM")
+#install.packages("mice")
+#install.packages("VIM")
+#install.packages("dplyr")
+#install.packages("graphics")
+#install.packages("psych")
+#install.packages("scales")
+#install.packages("RColorBrewer")
+#install.packages("paletteer")
+#install.packages("stats")
+#install.packages("tidyverse")
+#install.packages("NbClust")
+#install.packages("cluster")
+#install.packages("factoextra")
+#install.packages("ggplot2")
+#install.packages("purrr")
+#install.packages("aplpack")
+#install.packages("andrews")
+library(andrews)
+library(aplpack)
+library(dendextend)
+library(cluster)
+library(factoextra)
+library(ggplot2)
+library(purrr)
+library(NbClust)
+library(tidyverse)
+library(stats)
+library(paletteer)
+library(RColorBrewer)
+library(scales)
+library(psych)
+library(graphics)
 library(VIM)
 library(mice)
 library(dplyr)
 ```
 
-```{r base-de-datos}
-infoHeroes <- read.csv("data/heroesInformation.csv", na.strings = c("-", "-99", "-99.0")) 
-# infoPowers <- read.csv("data/superHeroPowers.csv")
-infoStats <- read.csv("data/charactersStats.csv", na.strings = "")
-colnames(infoHeroes)[2] <- "Name"
+### Importación de los Datos
 
+En este apartado se declaran los data frame's
+
+```{r import-datos, message=FALSE, warning=FALSE}
+infoHeroes <- read.csv("Data/heroesInformation.csv", na.strings = c("-", "-99", "-99.0")) 
+infoStats <- read.csv("Data/charactersStats.csv", na.strings = "")
+colnames(infoHeroes)[2] <- "Name"
 DC_Marvel <- infoHeroes %>% 
   filter(infoHeroes$Publisher %in% c("DC Comics", "Marvel Comics"))
-
-duplicated(DC_Marvel$Name)
-dim(DC_Marvel)
 DC_Marvel <- DC_Marvel %>%
   filter(!duplicated(Name))
-
 Dc_Marvel_StatsInfo <- left_join(DC_Marvel, infoStats, by = "Name")
+```
 
-Dc_Marvel_StatsInfo %>%
-count(Height)
+### Manipulación de la base de datos Dc_Marvel_StatsInfo
 
-md.pattern(Dc_Marvel_StatsInfo, rotate.names = T)
+Se realiza un descarte de variables y chequeo, así como la completación de valores faltantes tanto de tipo caracter como numérico.
 
-Dc_Marvel_StatsInfo <- Dc_Marvel_StatsInfo[,-9]
-
-aggr_plot <- aggr(Dc_Marvel_StatsInfo, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(Dc_Marvel_StatsInfo), 
-                  cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+```{r limpieza-datos_char, message=FALSE, warning=FALSE}
+Dc_Marvel_StatsInfo <- Dc_Marvel_StatsInfo[,-c(9,12)]
 
 Dc_Marvel_StatsInfo$Race[is.na(Dc_Marvel_StatsInfo$Race)] <- "Undefined"
 Dc_Marvel_StatsInfo$Eye.color[is.na(Dc_Marvel_StatsInfo$Eye.color)] <- "Undefined"
@@ -48,15 +74,53 @@ Dc_Marvel_StatsInfo$Gender[is.na(Dc_Marvel_StatsInfo$Gender)] <- "Undefined"
 
 ```
 
-```{r}
-columns <- c("Weight", "Height")
+
+Gráficos para identificar las variables numéricas faltantes. Y observamos que las más incompletas son "Weight" y "Height".
+
+
+```{r ident-datos-falt-1, message=FALSE, warning=FALSE}
+aggr_plot <- aggr(Dc_Marvel_StatsInfo, col=c('navyblue','turquoise'), numbers=TRUE, sortVars=TRUE, labels=names(Dc_Marvel_StatsInfo), 
+                  cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+```
+
+En la siguiente sección de código se implementan funciones para completar los datos faltantes en el data frame Dc_Marvel_StatsInfo para finalmente declarar el data frame Marvel_StatsInfo con el que se realizará el análisis estadístico.
+
+```{r compl-datos-num, message=FALSE, warning=FALSE}
+#md.pattern(Dc_Marvel_StatsInfo, rotate.names = T)
+
+columns <- c("Weight", "Height", "Intelligence", "Strength", "Speed", "Durability", "Power", "Combat")
 imputed_data <- mice(Dc_Marvel_StatsInfo[,names(Dc_Marvel_StatsInfo) %in% columns],m = 1,
-  maxit = 1, method = "mean",seed = 2018,print=F)
+                     maxit = 1, method = "mean",seed = 2018,print=F)
 complete.data <- mice::complete(imputed_data)
+Dc_Marvel_StatsInfo$Weight <- complete.data$Weight
+Dc_Marvel_StatsInfo$Height <- complete.data$Height
+Dc_Marvel_StatsInfo$Intelligence <- complete.data$Intelligence
+Dc_Marvel_StatsInfo$Strength <- complete.data$Strength
+Dc_Marvel_StatsInfo$Speed <- complete.data$Speed
+Dc_Marvel_StatsInfo$Durability <- complete.data$Durability
+Dc_Marvel_StatsInfo$Power <- complete.data$Power
+Dc_Marvel_StatsInfo$Combat <- complete.data$Combat
+
+for (i in 1:nrow(Dc_Marvel_StatsInfo)) {
+  Dc_Marvel_StatsInfo$Total[i] <- sum(Dc_Marvel_StatsInfo[,c("Intelligence", "Strength", "Speed", "Durability", "Power", "Combat")][i,])
+}
+
+Marvel_StatsInfo <- Dc_Marvel_StatsInfo %>%
+  filter(Publisher == "Marvel Comics")
+head(Marvel_StatsInfo)
+
+```
+
+Se hace una nueva revisión en busca de datos numéricos faltantes y se observa que ya está completa la base de datos.
+
+```{r check-datos-falt, message=FALSE, warning=FALSE}
+aggr_plot <- aggr(Dc_Marvel_StatsInfo, col=c('navyblue','turquoise'), numbers=TRUE, sortVars=TRUE, labels=names(Dc_Marvel_StatsInfo), 
+                  cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
 ```
 
 
-```{r}
+
+```{r, include=FALSE, message=FALSE, warning=FALSE}
 # https://rpubs.com/ydmarinb/429757
 par(mfrow=c(1,2))
 plot(density(Dc_Marvel_StatsInfo$Weight,na.rm = T),col=2,main="Weight")
@@ -65,6 +129,237 @@ plot(density(Dc_Marvel_StatsInfo$Height,na.rm = T),col=2,main="Height")
 lines(density(complete.data$Height),col=3)
 ```
 
-# Base Claribel
+# Análisis exploratorio de los datos de la compañia Marvel
 
-Prueba
+A continuación se observa que las  variables "Height", "Weight", "Strenght" y "Speed" cuentan con datos muy sesgados ya que hay valores extremos en sentido positivo.
+```{r analisis-general-1, message=FALSE, warning=FALSE}
+summary(Marvel_StatsInfo, na.rm = TRUE)
+```
+
+Ahora se presenta la información de la base de datos de la variable "Intelligence" y observamos que el rango de la variable es [1,100] siendo la inteligencia más frecuente con un valor de 1.
+
+```{r analisis-general-2, message=FALSE, warning=FALSE}
+Marvel_StatsInfo %>%
+  select(Name, Publisher, Intelligence) %>%
+  count(Intelligence) %>%
+  arrange(desc(Intelligence))
+```
+
+Luego filtramos la información de la base de datos de la variable "Alignment.x" y observamos que los valores posibles son "neutral", "good", "bad" y "Undefined", siendo la alineación más frecuente "good".
+
+```{r analisis-general-3, message=FALSE, warning=FALSE}
+Marvel_StatsInfo %>%
+  select(Name, Publisher, Alignment.x) %>%
+  count(Alignment.x) %>%
+  arrange(desc(Alignment.x))
+```
+
+Ahora observamos la información seleccionando las variables "Alignment.x" e "Intelligence" y notando que las inteligencias más altas se encuentran distribuidas en las alineaciones "bad" y "neutral".
+
+```{r analisis-general-4, message=FALSE, warning=FALSE}
+Marvel_StatsInfo %>%
+  select(Name, Publisher, Intelligence, Alignment.x) %>%
+  count(Alignment.x, Intelligence) %>%
+  arrange(desc(Intelligence))
+```
+
+Posterior a ello visualizamos la aseveración previa con el siguiente Box plot.
+
+```{r scattered,include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+#pp <- Dc_Marvel_StatsInfo %>%
+ # select(X, Intelligence, Alignment.x)
+
+plot(Dc_Marvel_StatsInfo$Intelligence, as.factor(Dc_Marvel_StatsInfo$Alignment.x), pch=c(19,24), cex=0.7,
+     col=Dc_Marvel_StatsInfo$Intelligence,
+     main="Intelligence vs Alignment.x", xlab="Intelligence", ylab="Alignment.x")
+
+# cl <- brewer.pal(n=4, name="Dark2")
+# pairs(Dc_Marvel_StatsInfo[,11:12], pch=18, cex=0.5, col=cl[Dc_Marvel_StatsInfo$Alignment.x],
+#      main="Scatterplot Dc_Marvel_StatsInfo", lower.panel = NULL)
+# #par(xpd = TRUE)
+# legend("bottomright", legend = levels(as.factor(Dc_Marvel_StatsInfo$Alignment.x)), pch=17, col=cl[1:4],
+#        pt.cex=1.2)
+```
+
+```{r box-plot, echo=FALSE, message=FALSE, warning=FALSE}
+
+boxplot(Dc_Marvel_StatsInfo$Intelligence ~ Dc_Marvel_StatsInfo$Alignment.x,
+        main = "Box plot de Intelligence vs Alignment.x",
+        xlab = "Intelligence",
+        ylab = "Alignment.x",
+        border = c("navyblue", "black", "gray", "purple"),
+        col = "white",
+        horizontal = TRUE,
+        frame = FALSE)
+
+```
+
+Tal y como se describió previamente, se puede observar que las inteligencias más altas se encuentran abundantemente distribuidas entre los individuos con "Alignment.x" "bad" o "neutral"
+
+
+
+# Plots de gráficos multivariados
+
+## Caritas de Chernoff
+
+A continuación se presenta el gráfico de las caritas de Chernoff para los 11 personajes con "Alignment.x" "neutral" y las variables "Intelligence", "Strenght", Speed", "Durability", "Power", y "Combat"
+
+```{r, message=FALSE, warning=FALSE}
+Marvel_StatsInfo %>%
+  select(Name, Alignment.x, Intelligence) %>%
+  filter(Alignment.x == "neutral") %>%
+  arrange(desc(Intelligence))
+```
+
+Observamos que aproximadamente la mitad de los personajes presentan rasgos similares (caritas parecidas), por lo que se puede deducir que el "Alignment.x" "neutral" podría estar relacionado con sus características.
+
+```{r, message=FALSE, warning=FALSE}
+faces(Marvel_StatsInfo[Marvel_StatsInfo$Alignment.x=="neutral", 11:16],
+      nrow.plot = 3, 
+      ncol.plot = 5,
+      main = "Personajes Neutrales", print.info = TRUE)
+```
+
+<!-- ## Curvas de Andrews -->
+
+<!-- Ahora se presentan los gráficos de las curvas de Andrews -->
+
+```{r include=FALSE}
+par(mfrow=c(2,2))
+andrews(Marvel_StatsInfo, type = 1, clr = 11, ymax = 3, main = "Curva tipo 1")
+andrews(Marvel_StatsInfo, type = 2, clr = 11, ymax = 3, main = "Curva tipo 2")
+andrews(Marvel_StatsInfo, type = 3, clr = 11, ymax = 3, main = "Curva tipo 3")
+andrews(Marvel_StatsInfo, type = 4, clr = 11, ymax = 3, main = "Curva tipo 4")
+```
+
+# Análisis por clusters
+
+Se analizan las varianzas y correlaciones de los datos. Posteriormente se escalan los datos para normalizarlos.
+
+```{r clusters, message=FALSE, warning=FALSE}
+
+
+var(data.matrix(Marvel_StatsInfo))
+cor.mat_all <- cor(data.matrix(Marvel_StatsInfo, rownames.force = NA), use="complete.obs")
+cor.mat_all
+
+DC_M <- scale(Marvel_StatsInfo$Intelligence)
+var(DC_M)
+
+dist <- dist(DC_M, method = "euclidean")
+head(as.factor(dist))
+
+```
+
+Se realizan los clusters
+
+```{r, message=FALSE, warning=FALSE}
+cluster_single <- hclust (d = dist, method = 'single')
+plot(cluster_single,cex=0.7, hang = -2)
+
+cluster_complete <- hclust (d = dist, method = 'complete')
+plot(cluster_complete, cex=0.7, hang = -2)
+
+cluster_average <- hclust (d = dist, method = 'average')
+plot(cluster_average, cex=0.7, hang = -2)
+
+cluster_ward <- hclust (d = dist, method = 'ward.D2')
+plot(cluster_ward,cex=0.7, hang = -2)
+
+par (mfrow = c(2,2))
+plot(cluster_single,cex=0.7, hang = -2)
+plot(cluster_complete,cex=0.7, hang = -2)
+plot(cluster_average,cex=0.7, hang = -2)
+plot(cluster_ward,cex=0.7, hang = -2)
+
+par (mfrow = c(1,1))
+```
+
+Se calcula y compara el coeficiente de correlación de los métodos
+
+```{r, message=FALSE, warning=FALSE}
+m <- c( "average", "single", "complete", "ward.D2", "median", "centroid")
+names(m) <- c( "average", "single", "complete", "ward.D2", "median", "centroid")
+
+coef_cor <- function(x) {
+  cor(x=dist, cophenetic(hclust(d=dist, method = x)))
+}
+```
+
+Realizamos una tabla comparativa y se calcula el número óptimo de clusters con el método del codo.
+Se observa que el método más adecuado es el de average. Además, según la gráfica, el número óptimo de clusters es 2 o 3.
+
+```{r, message=FALSE, warning=FALSE}
+coef_tabla <- map_dbl(m, coef_cor) 
+coef_tabla
+
+fviz_nbclust(x = DC_M, FUNcluster = hcut, method = "wss", diss = dist, k.max = 7) +
+  labs(title = "Número óptimo de clusters") +
+  xlab("Número de clústers")
+```
+
+Aplicamos el método del índice de Hubert e índice D y obtenemos que el número óptimo de clusters es 5.
+
+Posterior a ello realizamos el gráfico con el número óptimo de cluster.
+```{r, message=FALSE, warning=FALSE}
+res.nbclust <- NbClust(DC_M, distance = "euclidean",
+                       min.nc = 2, max.nc = 10, 
+                       method = "average", index ="all")
+
+plot(cluster_average, cex = 0.6, hang = -2)
+```
+
+Haciendo el cálculo de la matriz de distancias encontramos algunos grupos sobresalientes entre los datos.
+
+```{r, warning=FALSE, message=FALSE}
+
+fviz_dist(dist.obj = dist, lab_size = 8)
+
+# Clusters
+set.seed(12345)
+hc_average <- hclust(d=dist, method = "average")
+
+fviz_dend(x = hc_average, k=4,
+          cex = 0.7,
+          main = "Cluster método average",
+          xlab = "Heros",
+          ylab = "Intelligence",
+          type= "rectangle",
+          sub = "",
+          horiz = TRUE)+
+  geom_hline(yintercept = 0.65, linetype = "dashed")
+
+
+sub_grp <- cutree(hc_average, k = 4)
+table(sub_grp)
+
+
+```
+
+
+# Análisis de PCA
+
+A continuación se realiza un análisis de componentes principales. Realizando una prueba de KMO, observamos que el análisis factorial es más que viable y se grafican las dos componentes con mayor varianza.
+
+```{r}
+kmo.1 <-KMO(Marvel_StatsInfo[,11:16])
+kmo.1
+
+cp1 <- princomp(Marvel_StatsInfo[,11:16], cor = TRUE, scores = TRUE)
+summary(cp1)
+
+biplot(cp1, col = c("black", "purple"), main = "Marvel_StatsInfo")
+```
+
+Del gráfico anterior podemos interpretar que las características de los personajes se dividen en cuatro grupos, de los cuales dos agrupan más de una variable, que son combate con inteligencia y velocidad con durabilidad.
+
+# Conclusiones
+
+De los análisis previos podemos concluir de manera general que la muestra tomada de la población tiende a agruparse según las variables que se consideren, puesto que en general se encuentran considerablemente correlacionadas.
+
+
+
+
+
+
+
